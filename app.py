@@ -1,8 +1,9 @@
 import json
+# from typing_extensions import dataclass_transform
 from xmlrpc.client import boolean
 import dateutil.parser
 import babel
-from flask import Flask, render_template, request, Response, flash, redirect, url_for
+from flask import Flask, render_template, request, Response, flash,jsonify, redirect, url_for, abort
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -11,7 +12,7 @@ from logging import Formatter, FileHandler
 from flask_wtf import Form
 from sqlalchemy import ForeignKey
 from forms import *
-
+import sys
 
 
 app = Flask(__name__)
@@ -38,7 +39,8 @@ class Venue(db.Model):
     seeking_talent = boolean
     seeking_description = db.Column(db.String(120))
     shows = db.relationship('Show',
-      backref=db.backref('veneues', lazy=True))
+                            backref=db.backref('veneues', lazy=True))
+
 
 
 class Artist(db.Model):
@@ -53,15 +55,19 @@ class Artist(db.Model):
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
     shows = db.relationship('Show',
-      backref=db.backref('artists', lazy=True))
+                            backref=db.backref('artists', lazy=True))
 
 
 class Show(db.Model):
     __tablename__ = 'Show'
 
-    db.Column('artist_id', db.Integer, db.ForeignKey('artist.id'), primary_key=True)
-    db.Column('venue_id', db.Integer, db.ForeignKey('venue.id'), primary_key=True)
-    date = db.Column(db.String)
+
+    id = db.Column(db.Integer, primary_key=True)
+    artist_id = db.Column(db.Integer, db.ForeignKey(
+        'Artist.id'), nullable=False)
+    venue_id = db.Column(db.Integer, db.ForeignKey(
+        'Venue.id'), nullable=False)
+    date = db.Column(db.String(120))
 
 
 def format_datetime(value, format='medium'):
@@ -83,8 +89,6 @@ def index():
 
 @app.route('/venues')
 def venues():
-
-    data = []
     return render_template('pages/venues.html', data=Venue.query.all())
 
 
@@ -96,12 +100,8 @@ def search_venues():
 
 @app.route('/venues/<int:venue_id>')
 def show_venue(venue_id):
-    data1 = {}
-    data2 = {}
-    data3 = {}
-    data = list(filter(lambda d: d['id'] ==
-                venue_id, [data1, data2, data3]))[0]
-    return render_template('pages/show_venue.html', venue=data)
+    venue = Venue.query.get(venue_id).all()
+    return render_template('pages/show_venue.html', data=venue)
 
 
 @app.route('/venues/create', methods=['GET'])
@@ -116,15 +116,17 @@ def create_venue_submission():
     return render_template('pages/home.html')
 
 
+
+
 @app.route('/venues/<venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
-
-    return None
+    Venue.query.filter_by(id=venue_id).delete()
+    db.session.commit()
+    return redirect(url_for('index'))
 
 
 @app.route('/artists')
 def artists():
-    data = [{}, {}, {}]
     return render_template('pages/artists.html', data=Artist.query.all())
 
 
@@ -142,13 +144,8 @@ def search_artists():
 @app.route('/artists/<int:artist_id>')
 def show_artist(artist_id):
 
-    data1 = {}
-    data2 = {}
-    data3 = {}
-
-    data = list(filter(lambda d: d['id'] ==
-                artist_id, [data1, data2, data3]))[0]
-    return render_template('pages/show_artist.html', artist=data)
+    artist = Artist.query.get(artist_id).all()
+    return render_template('pages/show_artist.html', data=artist)
 
 
 @ app.route('/artists/<int:artist_id>/edit', methods=['GET'])
@@ -197,17 +194,6 @@ def create_artist_submission():
 
 @ app.route('/shows')
 def shows():
-
-    data = [{
-    }, {
-
-    }, {
-
-    }, {
-
-    }, {
-
-    }]
     return render_template('pages/shows.html', data=Show.query.all())
 
 
@@ -220,16 +206,24 @@ def create_shows():
 
 @ app.route('/shows/create', methods=['POST'])
 def create_show_submission():
-    artist_id = request.form['artist_id']
-    venue_id = request.form['venue_id']
-    start_time = request.form['start_time']
-    artist = Artist(artist_id=artist_id)
-    venue = Artist(venue_id=venue_id)
-    time = Artist(start_time_id=start_time)
-    db.session.add(artist, venue, time)
-    db.session.commit()
-
-    flash('Show was successfully listed!')
+    error = False
+    try:
+        artist_id = request.form['artist_id']
+        venue_id = request.form['venue_id']
+        start_time = request.form['start_time']
+        show = Show(artist_id=artist_id, venue_id=venue_id,  date=start_time)
+        db.session.add(show)
+        db.session.commit()
+    except:
+        error = True
+        db.session.rollback()
+        print(sys.exc_info())
+    finally:
+        db.session.close()
+    if error:
+        abort (400)
+    else:
+        flash('Show was successfully listed!')
 
     return render_template('pages/home.html', data=Show.query.all())
 

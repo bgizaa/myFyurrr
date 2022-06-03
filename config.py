@@ -10,7 +10,7 @@ DEBUG = True
 
 
 # TODO IMPLEMENT DATABASE URL
-SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:abc@localhost:5432/myflaskproject'
+SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:root@localhost:5432'
 
 
 #sqlite:///database.db
